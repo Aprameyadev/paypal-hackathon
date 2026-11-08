@@ -1,0 +1,55 @@
+# PayPilot AI — Project Context & Architecture
+
+**PayPilot AI: Your Autonomous Cashflow Copilot**  
+*PayPal AI Hackathon 2026 Submission Prototype*
+
+---
+
+## 1. Project Overview & Status
+
+PayPilot AI is an autonomous receivables management platform combining conversational AI with PayPal payment infrastructure. Freelancers, creators, and service businesses can talk to an AI copilot to manage invoices, trace outstanding debts, auto-generate PayPal checkout links, draft personalized reminders, and analyze revenue trends.
+
+### Existing Architecture vs Rebuilt Modules
+- **Previous Prototype**: Included a basic contract parser and escrow milestone structure.
+- **Transformed Architecture**:
+  - Full receivables lifecycle: Invoices, Customers, Transactions, Reminders, and Autonomous Financial Tools.
+  - Complete sidebar & topbar navigation layout (Overview, AI Assistant, Invoices, Customers, Transactions, Analytics, Settings).
+  - Dual-mode Data Layer (`lib/db`): Works directly with Supabase PostgreSQL when configured; seamlessly provides a reactive local demo store populated with Alex Johnson ($150, Pending), Sarah Miller ($250, Overdue), and John Smith ($100, Paid) so testing works instantly out-of-the-box.
+  - PayPal Integration: Orders API v2 (create & capture order) with `@paypal/react-paypal-js` client SDK + server-side capture verification and webhook endpoint.
+  - Gemini AI Function Calling: 11 specialized financial tools with user confirmation for consequential actions.
+  - AG Grid & Recharts Analytics: Interactive financial tables and dynamic visualizations.
+
+---
+
+## 2. Technology Stack
+
+- **Framework**: Next.js 16 (Turbopack, App Router)
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Lucide Icons, Recharts 3.10, AG Grid 36.3
+- **AI**: Google Gemini API (`@google/genai`, `gemini-2.5-flash` with function/tool calling and structured outputs)
+- **Payments**: PayPal Developer Sandbox (Orders v2 Create & Capture, Webhooks)
+- **Database**: Supabase PostgreSQL with RLS, with intelligent fallback data adapter
+
+---
+
+## 3. Database Schema
+
+Tables defined in `database/schema.sql`:
+1. `profiles`
+2. `customers`
+3. `invoices`
+4. `transactions`
+5. `reminders`
+6. `agent_actions`
+
+---
+
+## 4. Execution Phases
+
+- [x] Phase 1: Inspection, Dependency audit & Project Context
+- [ ] Phase 2: Foundation (Database schema, seed data, Dual Data Adapter, Layout & Navigation)
+- [ ] Phase 3: Core Application (Dashboard, Invoices, Customers, Transactions, Settings)
+- [ ] Phase 4: PayPal Sandbox Integration (Orders v2, Capture, Webhooks, Client Buttons)
+- [ ] Phase 5: Gemini AI Financial Assistant (11 tools, confirmation dialogs, memory)
+- [ ] Phase 6: AG Grid & Recharts Analytics
+- [ ] Phase 7: Polish, Error Handling, Design & Responsiveness
+- [ ] Phase 8: Verification, Testing & Hackathon Documentation
