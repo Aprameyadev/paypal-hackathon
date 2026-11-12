@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getInvoices, createInvoice } from '@/lib/db';
 import { readJsonObject } from '@/lib/http';
+import { getSessionUserFromRequest } from '@/lib/auth';
 
 const createInvoiceSchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
@@ -14,12 +15,14 @@ const createInvoiceSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    const userId = user?.id;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const customerId = searchParams.get('customerId');
     const search = searchParams.get('search')?.toLowerCase();
 
-    let invoices = await getInvoices();
+    let invoices = await getInvoices(userId);
 
     if (status && status !== 'ALL') {
       invoices = invoices.filter(i => i.status.toUpperCase() === status.toUpperCase());
@@ -46,6 +49,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    const userId = user?.id;
     const body = await readJsonObject(request);
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
 
@@ -54,7 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Validation failed' }, { status: 400 });
     }
 
-    const newInvoice = await createInvoice(parsed.data);
+    const newInvoice = await createInvoice(parsed.data, userId);
     return NextResponse.json({ invoice: newInvoice }, { status: 201 });
   } catch (error) {
     console.error('Error creating invoice:', error);

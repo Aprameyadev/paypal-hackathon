@@ -89,3 +89,11 @@ export interface CustomerWithMetrics extends Customer {
   totalOutstanding: number;
   invoiceCount: number;
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  isDemo?: boolean;
+}
+

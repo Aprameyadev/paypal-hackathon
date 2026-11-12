@@ -14,6 +14,11 @@ export async function POST(request: Request) {
 
     const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim();
 
+    if (process.env.NODE_ENV === 'production' && !webhookId) {
+      console.error('PAYPAL_WEBHOOK_ID is required in production');
+      return NextResponse.json({ error: 'Webhook verification is not configured' }, { status: 503 });
+    }
+
     // Verify signature if webhook ID is configured
     if (webhookId) {
       const authAlgo = request.headers.get('PAYPAL-AUTH-ALGO') || '';
@@ -42,7 +47,7 @@ export async function POST(request: Request) {
     console.log(`Received PayPal Webhook: ${eventType}`);
 
     // Handle Payment Capture Completed
-    if (eventType === 'PAYMENT.CAPTURE.COMPLETED' || eventType === 'CHECKOUT.ORDER.APPROVED') {
+    if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
       const resource = event.resource;
       const customId = resource?.custom_id || resource?.supplementary_data?.related_ids?.order_id;
       const orderId = resource?.id || resource?.supplementary_data?.related_ids?.order_id;

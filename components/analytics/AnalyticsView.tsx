@@ -2,19 +2,16 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { ModuleRegistry, AllCommunityModule, ColDef, GridApi } from 'ag-grid-community';
+import { ModuleRegistry, AllCommunityModule, ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 import {
-  BarChart3,
   Download,
   Search,
-  Filter,
   FileText,
   CreditCard,
   Users,
   RefreshCw,
-  TrendingUp,
 } from 'lucide-react';
 import {
   BarChart,
@@ -285,6 +282,7 @@ export default function AnalyticsView() {
             {activeTab === 'invoices' && (
               <AgGridReact<Invoice>
                 ref={gridRef}
+                theme="legacy"
                 rowData={invoices}
                 columnDefs={invoiceColumns}
                 quickFilterText={quickFilter}
@@ -298,6 +296,7 @@ export default function AnalyticsView() {
             {activeTab === 'transactions' && (
               <AgGridReact<Transaction>
                 ref={gridRef}
+                theme="legacy"
                 rowData={transactions}
                 columnDefs={transactionColumns}
                 quickFilterText={quickFilter}
@@ -311,6 +310,7 @@ export default function AnalyticsView() {
             {activeTab === 'customers' && (
               <AgGridReact<CustomerWithMetrics>
                 ref={gridRef}
+                theme="legacy"
                 rowData={customers}
                 columnDefs={customerColumns}
                 quickFilterText={quickFilter}

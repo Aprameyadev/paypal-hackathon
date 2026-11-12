@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
-import { X, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { X, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Invoice } from '@/types';
 
 interface PayPalCheckoutModalProps {

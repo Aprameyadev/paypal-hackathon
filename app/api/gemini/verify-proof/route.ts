@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { verifyDeliverableProof } from '@/lib/gemini/client';
-import { getSupabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
+import { getSessionUserFromRequest } from '@/lib/auth';
 import { captureAuthorization } from '@/lib/paypal/client';
 import { readJsonObject } from '@/lib/http';
 
 export async function POST(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await readJsonObject(request);
     if (!body) return NextResponse.json({ error: 'Request body must be a valid JSON object' }, { status: 400 });
     const { milestoneId, contractId, proofSubmitted, autoCapture = false } = body;
@@ -13,10 +16,10 @@ export async function POST(request: Request) {
     if (proofSubmitted.length > 10_000) return NextResponse.json({ error: 'Proof text must be 10,000 characters or fewer' }, { status: 413 });
     if (typeof autoCapture !== 'boolean') return NextResponse.json({ error: 'autoCapture must be a boolean' }, { status: 400 });
 
-    const db = getSupabase();
+    const db = await createClient();
     const [{ data: milestone, error: milestoneError }, { data: contract, error: contractError }] = await Promise.all([
       db.from('milestones').select('id,contract_id,description,verification_criteria,amount,status,paypal_capture_id').eq('id', milestoneId).single(),
-      db.from('contracts').select('id,status,currency,paypal_authorization_id').eq('id', contractId).single(),
+      db.from('contracts').select('id,status,currency,paypal_authorization_id').eq('id', contractId).eq('user_id', user.id).single(),
     ]);
     if (milestoneError || !milestone) return NextResponse.json({ error: 'Milestone record not found' }, { status: 404 });
     if (contractError || !contract) return NextResponse.json({ error: 'Contract record not found' }, { status: 404 });
@@ -26,7 +29,7 @@ export async function POST(request: Request) {
 
     const verification = await verifyDeliverableProof(milestone.description, milestone.verification_criteria || milestone.description, proofSubmitted.trim());
     const nextStatus = verification.is_valid ? 'VERIFIED' : 'PENDING';
-    const { error: saveError } = await db.from('milestones').update({ proof_submitted: proofSubmitted.trim(), ai_verification_notes: verification.reasoning, ai_confidence_score: verification.confidence_score, status: nextStatus }).eq('id', milestoneId);
+    const { error: saveError } = await db.from('milestones').update({ proof_submitted: proofSubmitted.trim(), ai_verification_notes: verification.reasoning, ai_confidence_score: verification.confidence_score, status: nextStatus }).eq('id', milestoneId).eq('contract_id', contractId);
     if (saveError) return NextResponse.json({ error: 'Verification completed but could not be saved' }, { status: 500 });
 
     let captureData: { id: string; status: string } | null = null;
@@ -38,9 +41,9 @@ export async function POST(request: Request) {
       const capture = await captureAuthorization(contract.paypal_authorization_id, Number(milestone.amount), contract.currency || 'USD', isFinalCapture, milestoneId);
       if (!capture?.id) return NextResponse.json({ error: 'Verification saved, but PayPal did not return a capture ID' }, { status: 502 });
       captureData = { id: capture.id, status: capture.status };
-      const { error: captureSaveError } = await db.from('milestones').update({ status: 'RELEASED', paypal_capture_id: capture.id }).eq('id', milestoneId).eq('status', 'VERIFIED');
+      const { error: captureSaveError } = await db.from('milestones').update({ status: 'RELEASED', paypal_capture_id: capture.id }).eq('id', milestoneId).eq('contract_id', contractId).eq('status', 'VERIFIED');
       if (captureSaveError) return NextResponse.json({ error: 'PayPal captured the funds, but the milestone record could not be updated' }, { status: 500 });
-      const { error: contractSaveError } = await db.from('contracts').update({ status: isFinalCapture ? 'COMPLETED' : 'IN_PROGRESS' }).eq('id', contractId);
+      const { error: contractSaveError } = await db.from('contracts').update({ status: isFinalCapture ? 'COMPLETED' : 'IN_PROGRESS' }).eq('id', contractId).eq('user_id', user.id);
       if (contractSaveError) return NextResponse.json({ error: 'PayPal captured the funds, but the contract status could not be updated' }, { status: 500 });
     }
 

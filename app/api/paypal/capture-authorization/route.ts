@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server';
 import { captureAuthorization } from '@/lib/paypal/client';
-import { getSupabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
+import { getSessionUserFromRequest } from '@/lib/auth';
 import { readJsonObject } from '@/lib/http';
 
 export async function POST(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await readJsonObject(request);
     if (!body) return NextResponse.json({ error: 'Request body must be a valid JSON object' }, { status: 400 });
     const { milestoneId, contractId, authorizationId } = body;
     if (typeof milestoneId !== 'string' || typeof contractId !== 'string' || typeof authorizationId !== 'string' || !milestoneId || !contractId || !authorizationId) return NextResponse.json({ error: 'Milestone, contract, and authorization IDs are required' }, { status: 400 });
 
-    const db = getSupabase();
+    const db = await createClient();
     const [{ data: milestone, error: milestoneError }, { data: contract, error: contractError }] = await Promise.all([
       db.from('milestones').select('id,contract_id,amount,status,paypal_capture_id').eq('id', milestoneId).single(),
-      db.from('contracts').select('id,status,currency,paypal_authorization_id').eq('id', contractId).single(),
+      db.from('contracts').select('id,status,currency,paypal_authorization_id').eq('id', contractId).eq('user_id', user.id).single(),
     ]);
     if (milestoneError || !milestone) return NextResponse.json({ error: 'Milestone record not found' }, { status: 404 });
     if (contractError || !contract) return NextResponse.json({ error: 'Contract record not found' }, { status: 404 });
@@ -27,10 +30,10 @@ export async function POST(request: Request) {
     const isFinalCapture = milestones.every((item: { id: string; status: string }) => item.id === milestoneId || item.status === 'RELEASED');
     const capture = await captureAuthorization(authorizationId, Number(milestone.amount), contract.currency || 'USD', isFinalCapture, milestoneId);
     if (!capture?.id) return NextResponse.json({ error: 'PayPal did not return a capture ID' }, { status: 502 });
-    const { error: updateMilestoneError } = await db.from('milestones').update({ status: 'RELEASED', paypal_capture_id: capture.id }).eq('id', milestoneId).eq('status', 'VERIFIED');
+    const { error: updateMilestoneError } = await db.from('milestones').update({ status: 'RELEASED', paypal_capture_id: capture.id }).eq('id', milestoneId).eq('contract_id', contractId).eq('status', 'VERIFIED');
     if (updateMilestoneError) return NextResponse.json({ error: 'Payment was captured but the milestone could not be updated' }, { status: 500 });
     const completed = isFinalCapture;
-    const { error: updateContractError } = await db.from('contracts').update({ status: completed ? 'COMPLETED' : 'IN_PROGRESS' }).eq('id', contractId);
+    const { error: updateContractError } = await db.from('contracts').update({ status: completed ? 'COMPLETED' : 'IN_PROGRESS' }).eq('id', contractId).eq('user_id', user.id);
     if (updateContractError) return NextResponse.json({ error: 'Payment was captured but the contract status could not be updated' }, { status: 500 });
     return NextResponse.json({ success: true, captureId: capture.id, status: capture.status, contractCompleted: completed });
   } catch (error) {

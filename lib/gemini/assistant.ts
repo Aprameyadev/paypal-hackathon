@@ -4,9 +4,7 @@ import {
   getInvoices,
   getInvoiceById,
   getCustomers,
-  getCustomerById,
   getTransactions,
-  createInvoice,
   saveReminder,
 } from '@/lib/db';
 import { createInvoicePaymentOrder, isPayPalConfigured } from '@/lib/paypal/client';
@@ -141,14 +139,14 @@ export const assistantToolDeclarations: FunctionDeclaration[] = [
 ];
 
 // Backend Tool Execution Map
-export async function executeTool(name: string, args: Record<string, any>): Promise<any> {
+export async function executeTool(name: string, args: Record<string, any>, userId?: string): Promise<any> {
   switch (name) {
     case 'getDashboardSummary': {
-      return await getDashboardSummary();
+      return await getDashboardSummary(userId);
     }
 
     case 'getOutstandingInvoices': {
-      const invoices = await getInvoices();
+      const invoices = await getInvoices(userId);
       const outstanding = invoices.filter(i => i.status === 'PENDING' || i.status === 'OVERDUE');
       return {
         count: outstanding.length,
@@ -166,7 +164,7 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
     }
 
     case 'getOverdueInvoices': {
-      const invoices = await getInvoices();
+      const invoices = await getInvoices(userId);
       const overdue = invoices.filter(i => i.status === 'OVERDUE');
       return {
         count: overdue.length,
@@ -184,12 +182,12 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
 
     case 'getCustomerPaymentHistory': {
       const query = String(args.customerIdOrName || '').toLowerCase();
-      const customers = await getCustomers();
+      const customers = await getCustomers(userId);
       const matchedCustomer = customers.find(c => c.id === query || c.name.toLowerCase().includes(query));
       if (!matchedCustomer) {
         return { error: `Customer matching "${args.customerIdOrName}" was not found.` };
       }
-      const invoices = await getInvoices();
+      const invoices = await getInvoices(userId);
       const customerInvoices = invoices.filter(i => i.customerId === matchedCustomer.id);
       return {
         customer: {
@@ -210,7 +208,7 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
     }
 
     case 'createInvoice': {
-      const customers = await getCustomers();
+      const customers = await getCustomers(userId);
       const custQuery = String(args.customerName || '').toLowerCase();
       let customer = customers.find(c => c.name.toLowerCase().includes(custQuery));
 
@@ -305,8 +303,8 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
     }
 
     case 'getRevenueAnalytics': {
-      const summary = await getDashboardSummary();
-      const transactions = await getTransactions();
+      const summary = await getDashboardSummary(userId);
+      const transactions = await getTransactions(userId);
       return {
         totalRevenue: summary.totalRevenue,
         monthlyTrends: summary.monthlyRevenue,
@@ -337,7 +335,7 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
     }
 
     case 'getTopCustomers': {
-      const customers = await getCustomers();
+      const customers = await getCustomers(userId);
       const sorted = [...customers].sort((a, b) => b.totalPaid - a.totalPaid);
       return {
         topCustomers: sorted.slice(0, 5).map(c => ({
@@ -358,7 +356,7 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
 /**
  * Main AI Assistant Conversation Handler
  */
-export async function chatWithAssistant(messages: { role: 'user' | 'model'; text: string }[]) {
+export async function chatWithAssistant(messages: { role: 'user' | 'model'; text: string }[], userId?: string) {
   if (!isGeminiConfigured()) {
     return {
       reply: 'PayPilot AI requires a Google Gemini API key to run autonomous workflows. Please configure `GEMINI_API_KEY` in your `.env.local` file to chat with the copilot.',
@@ -381,7 +379,7 @@ Do not fabricate data or pretend you sent emails. Be concise, professional, frie
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents,
       config: {
         systemInstruction,
@@ -398,11 +396,11 @@ Do not fabricate data or pretend you sent emails. Be concise, professional, frie
       const toolArgs = (call.args as Record<string, any>) || {};
 
       console.log(`AI invoking tool: ${toolName}`, toolArgs);
-      const toolResult = await executeTool(toolName, toolArgs);
+      const toolResult = await executeTool(toolName, toolArgs, userId);
 
       // Send the tool result back to Gemini to generate the final natural response
       const followUp = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           ...contents,
           {

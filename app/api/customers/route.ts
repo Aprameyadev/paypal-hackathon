@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCustomers, createCustomer } from '@/lib/db';
 import { readJsonObject } from '@/lib/http';
+import { getSessionUserFromRequest } from '@/lib/auth';
 
 const createCustomerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -12,10 +13,12 @@ const createCustomerSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    const userId = user?.id;
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search')?.toLowerCase();
 
-    let customers = await getCustomers();
+    let customers = await getCustomers(userId);
 
     if (search) {
       customers = customers.filter(c =>
@@ -34,6 +37,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    const userId = user?.id;
     const body = await readJsonObject(request);
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
 
@@ -42,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Validation failed' }, { status: 400 });
     }
 
-    const newCustomer = await createCustomer(parsed.data);
+    const newCustomer = await createCustomer(parsed.data, userId);
     return NextResponse.json({ customer: newCustomer }, { status: 201 });
   } catch (error) {
     console.error('Error creating customer:', error);

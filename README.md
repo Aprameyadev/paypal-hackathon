@@ -20,7 +20,7 @@ Freelancers, creators, and small service businesses spend dozens of hours each m
 
 ## 2. Key Capabilities
 
-### 🧠 Autonomous Financial Copilot (Gemini 2.5 Flash)
+### 🧠 Autonomous Financial Copilot (Gemini 3.8 Flash)
 Powered by 11 real backend function-calling tools:
 1. `getDashboardSummary()` — High-level cash flow and receivables summary.
 2. `getOutstandingInvoices()` — Pending and unpaid invoices.
@@ -51,7 +51,7 @@ Powered by 11 real backend function-calling tools:
 
 - **Framework**: Next.js 16 (App Router, React 19, Turbopack)
 - **Styling**: Tailwind CSS v4, Lucide Icons
-- **AI Intelligence**: Google Gemini API (`@google/genai`, `gemini-2.5-flash`)
+- **AI Intelligence**: Google Gemini API (`@google/genai`, `gemini-3.8-flash`)
 - **Payments**: PayPal Developer Sandbox (Orders v2 API)
 - **Data Tables**: AG Grid Community 36
 - **Charts**: Recharts 3.10

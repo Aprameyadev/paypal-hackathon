@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createAuthorizationOrder } from '@/lib/paypal/client';
-import { getSupabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
+import { getSessionUserFromRequest } from '@/lib/auth';
 import { readJsonObject } from '@/lib/http';
 
 export async function POST(request: Request) {
   try {
+    const user = getSessionUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await readJsonObject(request);
     if (!body) return NextResponse.json({ error: 'Request body must be a valid JSON object' }, { status: 400 });
     const { contractId } = body;
     if (typeof contractId !== 'string' || !contractId.trim()) return NextResponse.json({ error: 'Contract ID is required' }, { status: 400 });
-    const db = getSupabase();
+    const db = await createClient();
     const [{ data: contract, error }, { data: milestones, error: milestoneError }] = await Promise.all([
-      db.from('contracts').select('id,total_amount,currency,status,paypal_order_id').eq('id', contractId).single(),
+      db.from('contracts').select('id,total_amount,currency,status,paypal_order_id').eq('id', contractId).eq('user_id', user.id).single(),
       db.from('milestones').select('amount').eq('contract_id', contractId),
     ]);
     if (error || !contract) return NextResponse.json({ error: 'Contract record not found' }, { status: 404 });
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
 
     const order = await createAuthorizationOrder(Number(contract.total_amount), contract.currency || 'USD', contract.id, contract.id);
     if (!order?.id) return NextResponse.json({ error: 'PayPal did not return an order ID' }, { status: 502 });
-    const { error: updateError } = await db.from('contracts').update({ paypal_order_id: order.id }).eq('id', contractId);
+    const { error: updateError } = await db.from('contracts').update({ paypal_order_id: order.id }).eq('id', contractId).eq('user_id', user.id);
     if (updateError) return NextResponse.json({ error: 'Order was created but could not be linked to the contract' }, { status: 500 });
     return NextResponse.json({ id: order.id, status: order.status, links: order.links });
   } catch (error) {

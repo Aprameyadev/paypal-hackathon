@@ -25,7 +25,7 @@ PayPilot AI is an autonomous receivables management platform combining conversat
 
 - **Framework**: Next.js 16 (Turbopack, App Router)
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4, Lucide Icons, Recharts 3.10, AG Grid 36.3
-- **AI**: Google Gemini API (`@google/genai`, `gemini-2.5-flash` with function/tool calling and structured outputs)
+- **AI**: Google Gemini API (`@google/genai`, `gemini-3.8-flash` with function/tool calling and structured outputs)
 - **Payments**: PayPal Developer Sandbox (Orders v2 Create & Capture, Webhooks)
 - **Database**: Supabase PostgreSQL with RLS, with intelligent fallback data adapter
 
@@ -64,5 +64,5 @@ The application satisfies the core hackathon acceptance criterion:
 1. **Dashboard & Metrics**: Displays live cash flow velocity charts, total receivables ($570 outstanding across Alex Johnson and Elena Rostova), overdue alerts ($250 for Sarah Miller), and settled PayPal transactions ($100 for John Smith).
 2. **Invoice Generation**: Form-based or autonomous copilot creation (`INV-2026-001` for Alex Johnson at $150.00).
 3. **PayPal Sandbox Checkout**: Modal integration initializing PayPal Orders v2 and executing verified server-side capture (`/api/paypal/capture-invoice-order`).
-4. **Autonomous AI Copilot**: Gemini 2.5 Flash function calling executes 11 financial tools, displaying real-time receivables without fabrication and seeking confirmation for mutations.
+4. **Autonomous AI Copilot**: Gemini 3.8 Flash function calling executes 11 financial tools, displaying real-time receivables without fabrication and seeking confirmation for mutations.
 5. **Interactive AG Grid Analytics**: Instant sorting, filtering, and CSV export for Invoices, Customers, and immutable Transaction audit logs.

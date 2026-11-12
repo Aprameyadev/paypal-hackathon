@@ -1,5 +1,6 @@
 import { Customer, CustomerWithMetrics, Invoice, Reminder, Transaction, DashboardSummary } from '@/types';
-import { getSupabase } from '@/lib/supabase/client';
+import { randomUUID } from 'node:crypto';
+import { createClient as createSupabaseServerClient } from '@/lib/supabase/server';
 
 const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -150,7 +151,6 @@ interface StoreState {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __paypilot_store__: StoreState | undefined;
 }
 
@@ -176,15 +176,28 @@ export function resetDemoStore(): void {
 }
 
 export function isSupabaseConfigured(): boolean {
-  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim());
+}
+
+function assertProductionDatabaseConfigured(): void {
+  if (process.env.NODE_ENV === 'production' && !isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured for production data access.');
+  }
+}
+
+function handleDatabaseFailure(message: string, error: unknown): void {
+  if (process.env.NODE_ENV === 'production') throw new Error(message, { cause: error });
+  console.warn(message, error);
 }
 
 // Data Access Layer with Automatic Fallback
 export async function getCustomers(userId: string = DEFAULT_USER_ID): Promise<CustomerWithMetrics[]> {
+  assertProductionDatabaseConfigured();
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
+      const db = await createSupabaseServerClient();
       const { data, error } = await db.from('customers').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      if (error) throw error;
       if (!error && data) {
         const invoices = await getInvoices(userId);
         return data.map((c: any) => {
@@ -206,13 +219,13 @@ export async function getCustomers(userId: string = DEFAULT_USER_ID): Promise<Cu
         });
       }
     } catch (e) {
-      console.warn('Supabase query failed, falling back to local store', e);
+      handleDatabaseFailure('Supabase customers query failed', e);
     }
   }
 
   const store = getLocalStore();
   const invoices = store.invoices;
-  return store.customers.map(c => {
+  return store.customers.filter(c => c.userId === userId).map(c => {
     const custInvoices = invoices.filter(i => i.customerId === c.id);
     const totalPaid = custInvoices.filter(i => i.status === 'PAID').reduce((sum, i) => sum + i.amount, 0);
     const totalOutstanding = custInvoices.filter(i => i.status === 'PENDING' || i.status === 'OVERDUE').reduce((sum, i) => sum + i.amount, 0);
@@ -225,14 +238,15 @@ export async function getCustomers(userId: string = DEFAULT_USER_ID): Promise<Cu
   });
 }
 
-export async function getCustomerById(id: string): Promise<CustomerWithMetrics | null> {
-  const customers = await getCustomers();
+export async function getCustomerById(id: string, userId: string = DEFAULT_USER_ID): Promise<CustomerWithMetrics | null> {
+  const customers = await getCustomers(userId);
   return customers.find(c => c.id === id) || null;
 }
 
 export async function createCustomer(data: Omit<Customer, 'id' | 'userId' | 'createdAt'>, userId: string = DEFAULT_USER_ID): Promise<Customer> {
+  assertProductionDatabaseConfigured();
   const newCustomer: Customer = {
-    id: `c${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: randomUUID(),
     userId,
     name: data.name.trim(),
     email: data.email.trim().toLowerCase(),
@@ -243,7 +257,7 @@ export async function createCustomer(data: Omit<Customer, 'id' | 'userId' | 'cre
 
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
+      const db = await createSupabaseServerClient();
       const { data: inserted, error } = await db.from('customers').insert({
         id: newCustomer.id,
         user_id: userId,
@@ -252,9 +266,10 @@ export async function createCustomer(data: Omit<Customer, 'id' | 'userId' | 'cre
         company: newCustomer.company,
         phone: newCustomer.phone,
       }).select().single();
-      if (!error && inserted) return newCustomer;
+      if (error) throw error;
+      if (inserted) return { ...newCustomer, id: inserted.id };
     } catch (e) {
-      console.warn('Supabase insert failed, saving to local store', e);
+      handleDatabaseFailure('Supabase customer insert failed', e);
     }
   }
 
@@ -264,12 +279,14 @@ export async function createCustomer(data: Omit<Customer, 'id' | 'userId' | 'cre
 }
 
 export async function getInvoices(userId: string = DEFAULT_USER_ID): Promise<Invoice[]> {
+  assertProductionDatabaseConfigured();
   const now = new Date().toISOString().split('T')[0];
 
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
+      const db = await createSupabaseServerClient();
       const { data, error } = await db.from('invoices').select('*, customers(name, email)').eq('user_id', userId).order('created_at', { ascending: false });
+      if (error) throw error;
       if (!error && data) {
         return data.map((inv: any) => {
           let status = inv.status;
@@ -296,7 +313,7 @@ export async function getInvoices(userId: string = DEFAULT_USER_ID): Promise<Inv
         });
       }
     } catch (e) {
-      console.warn('Supabase invoices query failed, falling back to local store', e);
+      handleDatabaseFailure('Supabase invoices query failed', e);
     }
   }
 
@@ -308,11 +325,11 @@ export async function getInvoices(userId: string = DEFAULT_USER_ID): Promise<Inv
     }
   });
 
-  return [...store.invoices];
+  return store.invoices.filter(inv => inv.userId === userId);
 }
 
-export async function getInvoiceById(id: string): Promise<Invoice | null> {
-  const invoices = await getInvoices();
+export async function getInvoiceById(id: string, userId: string = DEFAULT_USER_ID): Promise<Invoice | null> {
+  const invoices = await getInvoices(userId);
   return invoices.find(i => i.id === id || i.invoiceNumber.toLowerCase() === id.toLowerCase()) || null;
 }
 
@@ -328,15 +345,15 @@ export async function createInvoice(
   },
   userId: string = DEFAULT_USER_ID
 ): Promise<Invoice> {
+  assertProductionDatabaseConfigured();
   const store = getLocalStore();
-  const customer = store.customers.find(c => c.id === data.customerId);
-  const nextNum = store.invoices.length + 1;
-  const invoiceNumber = `INV-2026-${String(nextNum).padStart(3, '0')}`;
+  const customer = store.customers.find(c => c.id === data.customerId && c.userId === userId);
+  const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
   const now = new Date().toISOString();
   const issueDate = data.issueDate || now.split('T')[0];
 
   const newInvoice: Invoice = {
-    id: `i${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: randomUUID(),
     userId,
     customerId: data.customerId,
     customerName: customer?.name || 'Customer',
@@ -354,8 +371,16 @@ export async function createInvoice(
 
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
-      await db.from('invoices').insert({
+      const db = await createSupabaseServerClient();
+      const { data: ownedCustomer, error: customerError } = await db
+        .from('customers')
+        .select('id')
+        .eq('id', data.customerId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (customerError) throw customerError;
+      if (!ownedCustomer) throw new Error('Customer not found for this account');
+      const { error: insertError } = await db.from('invoices').insert({
         id: newInvoice.id,
         user_id: userId,
         customer_id: newInvoice.customerId,
@@ -367,8 +392,10 @@ export async function createInvoice(
         due_date: newInvoice.dueDate,
         status: newInvoice.status,
       });
+      if (insertError) throw insertError;
+      return newInvoice;
     } catch (e) {
-      console.warn('Supabase invoice insert failed, saved to local store', e);
+      handleDatabaseFailure('Supabase invoice insert failed', e);
     }
   }
 
@@ -381,10 +408,14 @@ export async function markInvoiceAsPaid(
   paypalOrderId: string,
   paypalCaptureId: string,
   paymentSource: string = 'PAYPAL_SANDBOX',
-  isDemo: boolean = false
+  isDemo: boolean = false,
+  userId?: string
 ): Promise<{ invoice: Invoice; transaction: Transaction } | null> {
+  assertProductionDatabaseConfigured();
   const store = getLocalStore();
-  const invoice = store.invoices.find(i => i.id === invoiceId || i.invoiceNumber === invoiceId);
+  const invoice = userId
+    ? await getInvoiceById(invoiceId, userId)
+    : store.invoices.find(i => i.id === invoiceId || i.invoiceNumber === invoiceId);
   if (!invoice) return null;
 
   invoice.status = 'PAID';
@@ -392,7 +423,7 @@ export async function markInvoiceAsPaid(
   invoice.updatedAt = new Date().toISOString();
 
   const newTransaction: Transaction = {
-    id: `t${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: randomUUID(),
     userId: invoice.userId,
     invoiceId: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
@@ -411,10 +442,18 @@ export async function markInvoiceAsPaid(
 
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
-      await Promise.all([
-        db.from('invoices').update({ status: 'PAID', paypal_order_id: paypalOrderId, updated_at: invoice.updatedAt }).eq('id', invoice.id),
-        db.from('transactions').insert({
+      const db = await createSupabaseServerClient();
+      const { data: updatedInvoice, error: invoiceUpdateError } = await db
+        .from('invoices')
+        .update({ status: 'PAID', paypal_order_id: paypalOrderId, updated_at: invoice.updatedAt })
+        .eq('id', invoice.id)
+        .eq('user_id', invoice.userId)
+        .neq('status', 'PAID')
+        .select('id')
+        .maybeSingle();
+      if (invoiceUpdateError) throw invoiceUpdateError;
+      if (!updatedInvoice) throw new Error('Invoice is missing, already paid, or does not belong to this account');
+      const { error: transactionError } = await db.from('transactions').insert({
           id: newTransaction.id,
           user_id: invoice.userId,
           invoice_id: invoice.id,
@@ -424,10 +463,11 @@ export async function markInvoiceAsPaid(
           currency: newTransaction.currency,
           status: 'COMPLETED',
           payment_source: paymentSource,
-        }),
-      ]);
+        });
+      if (transactionError) throw transactionError;
     } catch (e) {
-      console.warn('Supabase update failed for markInvoiceAsPaid', e);
+      handleDatabaseFailure('Supabase payment recording failed', e);
+      return null;
     }
   }
 
@@ -435,10 +475,12 @@ export async function markInvoiceAsPaid(
 }
 
 export async function getTransactions(userId: string = DEFAULT_USER_ID): Promise<Transaction[]> {
+  assertProductionDatabaseConfigured();
   if (isSupabaseConfigured()) {
     try {
-      const db = getSupabase();
+      const db = await createSupabaseServerClient();
       const { data, error } = await db.from('transactions').select('*, invoices(invoice_number, customer_id, customers(name))').eq('user_id', userId).order('created_at', { ascending: false });
+      if (error) throw error;
       if (!error && data) {
         return data.map((t: any) => ({
           id: t.id,
@@ -457,17 +499,17 @@ export async function getTransactions(userId: string = DEFAULT_USER_ID): Promise
         }));
       }
     } catch (e) {
-      console.warn('Supabase transactions query failed', e);
+      handleDatabaseFailure('Supabase transactions query failed', e);
     }
   }
 
   const store = getLocalStore();
-  return [...store.transactions];
+  return store.transactions.filter(transaction => transaction.userId === userId);
 }
 
 export async function getReminders(userId: string = DEFAULT_USER_ID): Promise<Reminder[]> {
   const store = getLocalStore();
-  return [...store.reminders];
+  return store.reminders.filter((reminder) => reminder.userId === userId);
 }
 
 export async function saveReminder(invoiceId: string, message: string, userId: string = DEFAULT_USER_ID): Promise<Reminder> {

@@ -6,14 +6,9 @@ import {
   Bot,
   Send,
   Sparkles,
-  AlertCircle,
   CheckCircle2,
   Copy,
   Check,
-  CreditCard,
-  FileText,
-  DollarSign,
-  Clock,
   ArrowRight,
   ShieldAlert,
 } from 'lucide-react';
@@ -98,7 +93,7 @@ export default function AssistantPage() {
       if (data.toolResult?.requiresConfirmation) {
         setPendingAction(data.toolResult);
       }
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -179,7 +174,7 @@ export default function AssistantPage() {
               <h1 className="text-lg font-bold text-white flex items-center gap-2">
                 PayPilot Financial Copilot
                 <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400 border border-blue-500/20">
-                  Gemini 2.5 Flash
+                  Gemini 3.8 Flash
                 </span>
               </h1>
               <p className="text-xs text-slate-400">

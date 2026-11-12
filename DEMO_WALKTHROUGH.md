@@ -24,7 +24,7 @@
 ### Scene 3: The Autonomous AI Copilot with Gemini Function Calling (1:15 - 2:05)
 - **Visual**: Navigate to **AI Assistant** (`/assistant`).
 - **Speaker**:  
-  *"Now let's switch to the AI Assistant. This isn't just a chatbot that gives generic text — it is an autonomous copilot powered by Gemini 2.5 Flash equipped with 11 secure financial backend tools."*
+  *"Now let's switch to the AI Assistant. This isn't just a chatbot that gives generic text — it is an autonomous copilot powered by Gemini 3.8 Flash equipped with 11 secure financial backend tools."*
 - **Action**:
   1. Click the suggested prompt: *"How much money am I waiting to receive?"*
      - Copilot invokes `getOutstandingInvoices` and provides the exact breakdown.
@@ -42,7 +42,7 @@
 ### Scene 5: Architecture & Closing (2:35 - 2:45)
 - **Visual**: Navigate to **Settings** showing connected services (PayPal Developer Sandbox, Google Gemini AI, Supabase).
 - **Speaker**:  
-  *"Built with Next.js 16, TypeScript, Tailwind CSS, Google Gemini 2.5 Flash, AG Grid, and the PayPal Orders v2 API. PayPilot AI turns receivables from a chore into an automated, autonomous cashflow copilot. Thank you!"*
+  *"Built with Next.js 16, TypeScript, Tailwind CSS, Google Gemini 3.8 Flash, AG Grid, and the PayPal Orders v2 API. PayPilot AI turns receivables from a chore into an automated, autonomous cashflow copilot. Thank you!"*
 
 ---
 

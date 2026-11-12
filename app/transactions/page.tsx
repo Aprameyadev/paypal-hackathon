@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { Container, Box, Title, Card, Badge } from '@mantine/core';
 import AppLayout from '@/components/layout/AppLayout';
 import {
   CreditCard,
-  CheckCircle2,
-  ExternalLink,
-  ShieldCheck,
   RefreshCw,
   Search,
   ArrowDownLeft,
@@ -47,107 +45,102 @@ export default function TransactionsPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 pb-12">
+      <Container size="xl" p={0} className="space-y-6 pb-12">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Transactions</h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Audit log of captured payments and verified PayPal Sandbox transfers.
+        <Box className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b-2 border-[#1C1C19] pb-6">
+          <Box>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-500 mb-1">
+              Audit &amp; Reconciliation
             </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-emerald-400">
-            <ShieldCheck className="h-4 w-4" />
-            <span className="text-xs font-semibold">Total Verified: ${totalCaptured.toFixed(2)} USD</span>
-          </div>
-        </div>
+            <Title order={1} className="font-serif text-[#1C1C19] text-3xl sm:text-4xl tracking-tight">
+              Transaction Ledger
+            </Title>
+            <p className="text-xs text-stone-600 mt-1">
+              Immutable audit log of all verified PayPal Sandbox capture IDs, order IDs, and timestamps.
+            </p>
+          </Box>
+          <Box className="border-2 border-[#1C1C19] bg-[#FBFBF9] px-4 py-2.5 shadow-[4px_4px_0px_0px_#1C1C19]">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Settled Funds</p>
+            <p className="font-serif text-xl font-bold text-[#14532D]">
+              +${totalCaptured.toFixed(2)} USD
+            </p>
+          </Box>
+        </Box>
 
         {/* Search */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+        <Box className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice # or order ID..."
-            className="w-full rounded-xl border border-slate-800 bg-[#0c1220] py-2 pl-9 pr-4 text-xs text-slate-200 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+            placeholder="Search Order ID, Invoice #, or Client..."
+            className="w-full border-2 border-[#1C1C19] bg-white py-2 pl-9 pr-4 text-xs font-medium text-[#1C1C19] placeholder:text-stone-400 shadow-[3px_3px_0px_0px_#1C1C19] focus:outline-none"
           />
-        </div>
+        </Box>
 
-        {/* Transactions Table */}
+        {/* Ledger Table / List */}
         {loading ? (
-          <div className="flex h-64 items-center justify-center text-slate-400">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
-          </div>
+          <Box className="flex h-64 items-center justify-center text-stone-500">
+            <RefreshCw className="h-6 w-6 animate-spin text-[#1C1C19]" />
+          </Box>
         ) : filtered.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-[#0c1220]/50 p-6 text-center">
-            <CreditCard className="h-10 w-10 text-slate-600 mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No transactions recorded yet</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Pay an invoice using PayPal Sandbox to view instant capture entries here.
+          <Card className="flex h-64 flex-col items-center justify-center bg-[#FBFBF9] border-2 border-dashed border-[#1C1C19] p-6 text-center">
+            <CreditCard className="h-10 w-10 text-stone-400 mb-2" />
+            <p className="font-serif text-lg font-bold text-[#1C1C19]">No transactions found</p>
+            <p className="text-xs text-stone-600 mt-1">
+              Complete a payment on an invoice to record a verified transaction.
             </p>
-          </div>
+          </Card>
         ) : (
-          <div className="rounded-2xl border border-slate-800 bg-[#0c1220] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-800 bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Transaction / Customer</th>
-                    <th className="py-3 px-4">Invoice #</th>
-                    <th className="py-3 px-4">PayPal Order ID</th>
-                    <th className="py-3 px-4">Capture ID</th>
-                    <th className="py-3 px-4">Source</th>
-                    <th className="py-3 px-4 text-right">Amount</th>
-                    <th className="py-3 px-4 text-right">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80 text-slate-300">
-                  {filtered.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3.5 px-4 font-medium text-white flex items-center gap-2">
-                        <div className="rounded-lg bg-emerald-500/10 p-1.5 text-emerald-400">
-                          <ArrowDownLeft className="h-3.5 w-3.5" />
-                        </div>
-                        <div>
-                          <span>{tx.customerName || 'PayPal Buyer'}</span>
-                          <p className="text-[10px] text-emerald-400 font-mono">STATUS: {tx.status}</p>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-semibold text-slate-200">
-                        {tx.invoiceNumber}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">
-                        {tx.paypalOrderId || '—'}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">
-                        {tx.paypalCaptureId || '—'}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                            tx.isDemo
-                              ? 'bg-slate-800 text-slate-400'
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}
-                        >
-                          {tx.paymentSource || 'PAYPAL'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-400">
-                        +${tx.amount.toFixed(2)} {tx.currency}
-                      </td>
-                      <td className="py-3.5 px-4 text-right text-slate-500 text-[11px]">
-                        {new Date(tx.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Card className="divide-y-2 divide-stone-200 border-2 border-[#1C1C19] bg-[#FBFBF9] p-0 shadow-[4px_4px_0px_0px_#1C1C19] overflow-hidden">
+            {filtered.map((t) => (
+              <Box
+                key={t.id}
+                className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-stone-50"
+              >
+                <Box className="space-y-1">
+                  <Box className="flex items-center gap-2.5">
+                    <Box className="border border-[#1C1C19] bg-white p-1 text-[#14532D]">
+                      <ArrowDownLeft className="h-3.5 w-3.5" />
+                    </Box>
+                    <span className="font-bold text-sm text-[#1C1C19]">
+                      {t.customerName || 'PayPal Customer'}
+                    </span>
+                    <Badge
+                      radius={0}
+                      className="border border-[#1C1C19] bg-[#14532D] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5"
+                    >
+                      {t.status}
+                    </Badge>
+                    {t.isDemo && (
+                      <span className="border border-[#1C1C19] bg-stone-200 px-1.5 py-0.2 text-[9px] font-bold uppercase text-[#1C1C19]">
+                        Simulator
+                      </span>
+                    )}
+                  </Box>
+                  <Box className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-stone-600">
+                    <span>Order: <strong>{t.paypalOrderId || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>Capture: <strong>{t.paypalCaptureId || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>Invoice: <strong>{t.invoiceNumber || 'N/A'}</strong></span>
+                  </Box>
+                </Box>
+
+                <Box className="text-right shrink-0">
+                  <p className="font-serif text-lg font-bold text-[#14532D]">
+                    +${t.amount.toFixed(2)} {t.currency}
+                  </p>
+                  <p className="text-[10px] text-stone-500 font-mono">
+                    {new Date(t.createdAt).toLocaleString()}
+                  </p>
+                </Box>
+              </Box>
+            ))}
+          </Card>
         )}
-      </div>
+      </Container>
     </AppLayout>
   );
 }
